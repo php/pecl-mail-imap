@@ -16,13 +16,13 @@ AC_DEFUN([IMAP_LIB_CHK],[
   done
 ])
 
-dnl PHP_IMAP_TEST_BUILD(function, action-if-ok, action-if-not-ok, extra-libs, extra-source)
+dnl PHP_IMAP_TEST_BUILD(function, action-if-ok, action-if-not-ok, extra-libs)
 dnl
 dnl The UW-IMAP c-client library was not originally designed to be a
 dnl shared library. The mm_foo functions are callbacks, and are required
 dnl to be implemented by the program that is linking to c-client. This
 dnl macro does the work of defining them all to no-ops for you. Note
-dnl that PHP_TEST_BUILD is a link test; the undefined symbols will only
+dnl that this is a link test; the undefined symbols will only
 dnl cause problems if you actually try to link with c-client. For
 dnl example, if your test is trivial enough to be optimized out, and if
 dnl you link with --as-needed, the test/library may be omitted entirely
@@ -30,8 +30,9 @@ dnl from the final executable. In that case linking will of course
 dnl succeed, but your luck won't necessarily apply at lower optimization
 dnl levels or systems where --as-needed is not used.
 AC_DEFUN([PHP_IMAP_TEST_BUILD], [
-  PHP_TEST_BUILD([$1], [$2], [$3], [$4], [$5]
-  [
+  old_LIBS=$LIBS
+  LIBS="$4 $LIBS"
+  AC_LINK_IFELSE([AC_LANG_SOURCE([
 #if defined(__GNUC__) && __GNUC__ >= 4
 # define PHP_IMAP_EXPORT __attribute__ ((visibility("default")))
 #else
@@ -53,6 +54,18 @@ AC_DEFUN([PHP_IMAP_TEST_BUILD], [
     PHP_IMAP_EXPORT void mm_exists(void){}
     PHP_IMAP_EXPORT void mm_searched(void){}
     PHP_IMAP_EXPORT void mm_expunged(void){}
+
+    char $1(void);
+    int main(void) {
+      $1();
+      return 0;
+    }
+  ])],[
+    LIBS=$old_LIBS
+    $2
+  ],[
+    LIBS=$old_LIBS
+    $3
   ])
 ])
 
@@ -230,9 +243,10 @@ if test "$PHP_IMAP" != "no"; then
     TST_LIBS="$DLIBS $IMAP_SHARED_LIBADD"
 
     dnl Check if auth_gss exists
-    PHP_IMAP_TEST_BUILD(auth_gssapi_valid, [
-      AC_DEFINE(HAVE_IMAP_AUTH_GSS, 1, [ ])
-    ], [], $TST_LIBS)
+    PHP_IMAP_TEST_BUILD([auth_gssapi_valid],
+      [AC_DEFINE([HAVE_IMAP_AUTH_GSS], [1], [ ])],
+      [],
+      [$TST_LIBS])
 
     dnl Check if utf8_to_mutf7 exists.
     old_CPPFLAGS="${CPPFLAGS}"
@@ -252,15 +266,12 @@ if test "$PHP_IMAP" != "no"; then
     AC_LANG_POP
 
 
-    AC_MSG_CHECKING(whether rfc822_output_address_list function present)
-    PHP_TEST_BUILD(foobar, [
-      AC_MSG_RESULT(yes)
-      AC_DEFINE(HAVE_RFC822_OUTPUT_ADDRESS_LIST, 1, [ ])
-    ], [
-      AC_MSG_RESULT(no)
-	], [
-      $TST_LIBS
-    ], [
+    AC_CACHE_CHECK([whether rfc822_output_address_list function is present],
+      [php_cv_imap_have_rfc822_output_address_list],
+      [
+      old_LIBS=$LIBS
+      LIBS="$TST_LIBS $LIBS"
+      AC_LINK_IFELSE([AC_LANG_SOURCE([
 #if defined(__GNUC__) && __GNUC__ >= 4
 # define PHP_IMAP_EXPORT __attribute__ ((visibility("default")))
 #else
@@ -285,13 +296,24 @@ if test "$PHP_IMAP" != "no"; then
       void rfc822_output_address_list(void);
       void (*f)(void);
       char foobar () {f = rfc822_output_address_list;}
+      char foobar(void);
+      int main(void) {
+        foobar();
+        return 0;
+        }
+    ])],
+      [php_cv_imap_have_rfc822_output_address_list=yes],
+      [php_cv_imap_have_rfc822_output_address_list=no])
+      LIBS=$old_LIBS
     ])
+    AS_VAR_IF([php_cv_imap_have_rfc822_output_address_list], [yes],
+      [AC_DEFINE([HAVE_RFC822_OUTPUT_ADDRESS_LIST], [1],
+        [Define to 1 if C-client has the 'rfc822_output_address_list' function.])])
 
     AC_MSG_CHECKING(whether build with IMAP works)
-    PHP_IMAP_TEST_BUILD(mail_newbody, [
-      AC_MSG_RESULT(yes)
-    ], [
+    PHP_IMAP_TEST_BUILD([mail_newbody],
+    [AC_MSG_RESULT(yes)], [
       AC_MSG_RESULT(no)
       AC_MSG_ERROR([build test failed. Please check the config.log for details.])
-    ], $TST_LIBS)
+    ], [$TST_LIBS])
 fi
