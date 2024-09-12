@@ -1,0 +1,63 @@
+name: Build
+on: [push, pull_request]
+jobs:
+  ubuntu:
+    strategy:
+      matrix:
+        version: ['8.4']
+    runs-on: ubuntu-22.04
+    steps:
+      - name: git checkout
+        uses: actions/checkout@v4
+      - name: Install depencies
+        run: |
+          sudo apt-get update -y | true
+          sudo apt-get install -y \
+            libkrb5-dev \
+            libgssapi-krb5-2 \
+            libc-client-dev
+      - name: Setup PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: ${{matrix.version}}
+      - name: phpize
+        run: phpize
+      - name: configure
+        run: ./configure --with-imap --with-kerberos --with-imap-ssl
+      - name: make
+        run: make
+  windows:
+    defaults:
+      run:
+        shell: cmd
+    strategy:
+      matrix:
+        version: ['8.4']
+        arch: [x64]
+        ts: [ts]
+    runs-on: windows-2022
+    steps:
+      - name: Checkout imap
+        uses: actions/checkout@v4
+      - name: Setup PHP
+        id: setup-php
+        uses: php/setup-php-sdk@v0.9
+        with:
+          version: ${{matrix.version}}
+          arch: ${{matrix.arch}}
+          ts: ${{matrix.ts}}
+      - name: Fetch dependencies
+        run: |
+          curl -LO https://downloads.php.net/~windows/pecl/deps/c-client-2007f-1-vs16-${{matrix.arch}}.zip
+          7z x c-client-2007f-1-vs16-${{matrix.arch}}.zip -o..\deps
+      - name: Enable Developer Command Prompt
+        uses: ilammy/msvc-dev-cmd@v1
+        with:
+          arch: ${{matrix.arch}}
+          toolset: ${{steps.setup-php.outputs.toolset}}
+      - name: phpize
+        run: phpize
+      - name: configure
+        run: configure --with-imap --with-prefix=${{steps.setup-php.outputs.prefix}}
+      - name: make
+        run: nmake
