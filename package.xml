@@ -15,10 +15,10 @@
   <email>derick@php.net</email>
   <active>yes</active>
  </lead>
- <date>2024-01-04</date>
- <time>10:18:07</time>
+ <date>2024-10-15</date>
+ <time>10:59:33</time>
  <version>
-  <release>1.0.2</release>
+  <release>1.0.3</release>
   <api>1.0.0</api>
  </version>
  <stability>
@@ -27,8 +27,8 @@
  </stability>
  <license uri="http://www.php.net/license/3_01.txt">PHP 3.01</license>
  <notes>
-- Fixed package.xml file with required minumum PHP version of 8.3.
-- Fixed embedded version number.
+- Build fixes for PHP 8.4.
+- Report extension version in phpinfo() output.
  </notes>
  <contents>
   <dir name="/">
