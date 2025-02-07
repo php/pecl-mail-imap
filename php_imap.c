@@ -422,6 +422,19 @@ static PHP_GINIT_FUNCTION(imap)
 }
 /* }}} */
 
+long auth_xoauth2_client (authchallenge_t challenger,authrespond_t responder,
+			  char *service,NETMBX *mb,void *stream,
+			  unsigned long *trial,char *user);
+
+AUTHENTICATOR auth_xoauth2 = {
+  AU_SECURE,			/* secure, has full auth, hidden */
+  "XOAUTH2",			/* authenticator name */
+  NIL,					/* always valid */
+  auth_xoauth2_client,	/* client method */
+  NIL,					/* server method */
+  NIL					/* next authenticator */
+};
+
 /* {{{ PHP_MINIT_FUNCTION */
 PHP_MINIT_FUNCTION(imap)
 {
@@ -451,6 +464,8 @@ PHP_MINIT_FUNCTION(imap)
 #endif
 	auth_link(&auth_pla);		/* link in the plain authenticator */
 #endif
+
+	auth_link(&auth_xoauth2);
 
 #ifdef HAVE_IMAP_SSL
 	ssl_onceonlyinit ();
@@ -4812,3 +4827,28 @@ PHP_IMAP_EXPORT void mm_fatal(char *str)
 {
 }
 /* }}} */
+
+/* Client authenticator for XOAUTH2 */
+long auth_xoauth2_client (authchallenge_t challenger,authrespond_t responder,
+			  char *service,NETMBX *mb,void *stream,
+			  unsigned long *trial,char *user)
+{
+	void *challenge;
+	unsigned long clen;
+	long ret = NIL;
+
+	*trial = 65535;		/* never retry */
+	if (challenge = (*challenger) (stream,&clen)) {
+		fs_give ((void **) &challenge);
+		/* send authorization string */
+		if ((*responder) (stream, strcpy(user, IMAPG(imap_user)), strlen(IMAPG(imap_user)))) {
+			if (challenge = (*challenger) (stream, &clen)) {
+				fs_give ((void **) &challenge);
+			} else {
+				ret = LONGT;		/* check the authentication */
+			}
+		}
+	}
+
+	return ret;
+}
