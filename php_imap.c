@@ -74,6 +74,11 @@ MAILSTREAM DEFAULTPROTO;
 
 #define SA_ALL SA_MESSAGES | SA_RECENT | SA_UNSEEN | SA_UIDNEXT | SA_UIDVALIDITY
 
+/* PHP 8.6 removed INI_STR() in favour of zend_ini_string_literal() */
+#ifndef zend_ini_string_literal
+# define zend_ini_string_literal(name) INI_STR(name)
+#endif
+
 #include "php_imap_arginfo.h"
 
 #if defined(__GNUC__) && __GNUC__ >= 4
@@ -460,7 +465,7 @@ PHP_MINIT_FUNCTION(imap)
 	php_imap_ce->create_object = imap_object_create;
 
 	memcpy(&imap_object_handlers, &std_object_handlers, sizeof(zend_object_handlers));
-	imap_object_handlers.offset = XtOffsetOf(php_imap_object, std);
+	imap_object_handlers.offset = offsetof(php_imap_object, std);
 	imap_object_handlers.get_constructor = imap_object_get_constructor;
 	imap_object_handlers.free_obj = imap_object_destroy;
 	imap_object_handlers.clone_obj = NULL;
@@ -3809,7 +3814,7 @@ bool _php_imap_mail(zend_string *to, zend_string *subject, zend_string *message,
 		strlcat(bufferHeader, ZSTR_VAL(headers), bufferLen + 1);
 	}
 
-	if (TSendMail(INI_STR("SMTP"), &tsm_err, &tsm_errmsg, bufferHeader, ZSTR_VAL(subject),
+	if (TSendMail(zend_ini_string_literal("SMTP"), &tsm_err, &tsm_errmsg, bufferHeader, ZSTR_VAL(subject),
 			bufferTo, ZSTR_VAL(message), bufferCc, bufferBcc, rpath ? ZSTR_VAL(rpath) : NULL) != SUCCESS) {
 		if (tsm_errmsg) {
 			php_error_docref(NULL, E_WARNING, "%s", tsm_errmsg);
@@ -3822,10 +3827,10 @@ bool _php_imap_mail(zend_string *to, zend_string *subject, zend_string *message,
 	}
 	PHP_IMAP_CLEAN;
 #else
-	if (!INI_STR("sendmail_path")) {
+	if (!zend_ini_string_literal("sendmail_path")) {
 		return 0;
 	}
-	sendmail = popen(INI_STR("sendmail_path"), "w");
+	sendmail = popen(zend_ini_string_literal("sendmail_path"), "w");
 	if (sendmail) {
 		if (rpath && ZSTR_LEN(rpath) != 0) {
 			fprintf(sendmail, "From: %s\n", ZSTR_VAL(rpath));
